@@ -10,13 +10,26 @@ public extension SessionService {
         EditorShim(paths: paths).environment
     }
 
+    /// Where Settings keeps checkouts and worktrees, for the
+    /// published choices: only the host user can read Settings, and
+    /// `agentide` looks wherever the app does. Always the resolved
+    /// path, so clearing an override replaces the one it left.
+    var locationChoices: [(key: String, value: String)] {
+        [
+            ("repositories-directory", paths.repositoriesDirectory),
+            ("worktrees-directory", paths.worktreesDirectory),
+        ]
+    }
+
     /// Publishes what a session was last started with, so
     /// `agentide new` offers the same repositories, agents, models
     /// and efforts with the last ones already chosen. Written as
     /// `key=value` lines because the sandbox has no JSON tool and
     /// the command reading them is a shell script, and merged with
     /// what is there: the file is one memory shared with that
-    /// command, which writes its own choices into it.
+    /// command, which writes its own choices into it. A value
+    /// holding a newline cannot be one line, so its key is dropped
+    /// and the command falls back to its own default.
     func publishSessionChoices(_ values: [(key: String, value: String)]) {
         let file = paths.agentideDirectory + "/session-defaults"
         var merged = [String]()
@@ -28,7 +41,7 @@ public extension SessionService {
             }
         }
         replaced = []
-        merged += values.map { $0.key + "=" + $0.value }
+        merged += values.filter { $0.value.contains("\n") == false }.map { $0.key + "=" + $0.value }
         try? FileManager.default.createDirectory(
             atPath: paths.agentideDirectory,
             withIntermediateDirectories: true,
